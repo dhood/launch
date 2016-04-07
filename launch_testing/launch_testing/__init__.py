@@ -14,8 +14,10 @@ class InMemoryHandler(LineOutput):
         that will only need one line to match, instead of the entire output.
     @param regex_match: If true, treat the expected_lines as a regular expression in match
         accordingly.
-    @param filtered_prefixes: A list of prefixes that will be ignored. By default the output of
-        RTI Connext will be ignored.
+    @param additional_filtered_prefixes: A list of prefixes that will be ignored in addition to
+        the default (RTI Connext licence output, return code and process ID).
+    @param filtered_prefixes: A list of prefixes that will be ignored in place of the default.
+        If specified, this argument overrides the ``additional_filtered_prefixes`` argument.
     @param exit_on_match: If True, then when its output is matched, this handler
         will terminate; otherwise it will simply keep track of the match.
     """
@@ -23,14 +25,13 @@ class InMemoryHandler(LineOutput):
     # TODO(esteve): This requires internal knowledge about the rmw implementations available.
     def __init__(
         self, name, launch_descriptor, expected_lines, regex_match=False,
-        filtered_prefixes=None, exit_on_match=True
+        additional_filtered_prefixes=None, filtered_prefixes=None, exit_on_match=True
     ):
         super(LineOutput, self).__init__()
         if filtered_prefixes is None:
-            self.filtered_prefixes = [
-                b'pid', b'rc',
-                b'RTI Data Distribution Service',
-                b'Expires on']
+            self.filtered_prefixes = get_default_filtered_prefixes()
+            if additional_filtered_prefixes:
+                self.filtered_prefixes.extend(additional_filtered_prefixes)
         else:
             self.filtered_prefixes = filtered_prefixes
         self.name = name
@@ -82,8 +83,16 @@ class InMemoryHandler(LineOutput):
             (output_lines, self.expected_lines)
 
 
+def get_default_filtered_prefixes():
+    return [
+        b'pid', b'rc',
+        b'RTI Data Distribution Service',
+        b'Expires on']
+
+
 def create_handler(
-    name, launch_descriptor, output_file, exit_on_match=True, filtered_prefixes=None
+    name, launch_descriptor, output_file, exit_on_match=True, additional_filtered_prefixes=None,
+    filtered_prefixes=None
 ):
     literal_file = output_file + '.txt'
     if os.path.isfile(literal_file):
@@ -91,14 +100,16 @@ def create_handler(
             expected_output = f.read().splitlines()
         return InMemoryHandler(
             name, launch_descriptor, expected_output, regex_match=False,
-            exit_on_match=exit_on_match, filtered_prefixes=filtered_prefixes)
+            exit_on_match=exit_on_match, additional_filtered_prefixes=additional_filtered_prefixes,
+            filtered_prefixes=filtered_prefixes)
     regex_file = output_file + '.regex'
     if os.path.isfile(regex_file):
         with open(regex_file, 'rb') as f:
             expected_output = f.read().splitlines()
         return InMemoryHandler(
             name, launch_descriptor, expected_output, regex_match=True,
-            exit_on_match=exit_on_match, filtered_prefixes=filtered_prefixes)
+            exit_on_match=exit_on_match, additional_filtered_prefixes=additional_filtered_prefixes,
+            filtered_prefixes=filtered_prefixes)
     py_file = output_file + '.py'
     if os.path.isfile(py_file):
         checker_module = SourceFileLoader(
