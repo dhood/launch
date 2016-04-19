@@ -2,6 +2,8 @@ from importlib.machinery import SourceFileLoader
 import io
 import os
 import re
+
+import ament_index_python
 from launch.output_handler import LineOutput
 
 
@@ -14,26 +16,31 @@ class InMemoryHandler(LineOutput):
         that will only need one line to match, instead of the entire output.
     @param regex_match: If true, treat the expected_lines as a regular expression in match
         accordingly.
-    @param additional_filtered_prefixes: A list of prefixes that will be ignored in addition to
-        the default (RTI Connext licence output, return code and process ID).
-    @param filtered_prefixes: A list of prefixes that will be ignored in place of the default.
-        If specified, this argument overrides the ``additional_filtered_prefixes`` argument.
+    @param filtered_prefixes: A list of prefixes that will cause output lines to be ignored if
+        they start with one of the prefixes. By default lines starting with
+        the process ID (`pid`) and return code (`rc`) will be ignored.
+    @param filtered_rmw_implementations: A list of RMW implementations for which the output will
+        be ignored in addition to the default/``filtered_prefixes``.
     @param exit_on_match: If True, then when its output is matched, this handler
         will terminate; otherwise it will simply keep track of the match.
+    :raises: :exc:`LookupError`
     """
 
-    # TODO(esteve): This requires internal knowledge about the rmw implementations available.
     def __init__(
         self, name, launch_descriptor, expected_lines, regex_match=False,
-        additional_filtered_prefixes=None, filtered_prefixes=None, exit_on_match=True
+        filtered_prefixes=None, filtered_rmw_implementations=None, exit_on_match=True
     ):
         super(LineOutput, self).__init__()
         if filtered_prefixes is None:
             self.filtered_prefixes = get_default_filtered_prefixes()
-            if additional_filtered_prefixes:
-                self.filtered_prefixes.extend(additional_filtered_prefixes)
         else:
             self.filtered_prefixes = filtered_prefixes
+
+        if filtered_rmw_implementations:
+            for rmw_implementation in filtered_rmw_implementations:
+                rmw_output_filter = get_rmw_output_filter(rmw_implementation)
+                self.filtered_prefixes.extend(rmw_output_filter)
+
         self.name = name
         self.launch_descriptor = launch_descriptor
         self.expected_lines = expected_lines
@@ -86,13 +93,37 @@ class InMemoryHandler(LineOutput):
 def get_default_filtered_prefixes():
     return [
         b'pid', b'rc',
-        b'RTI Data Distribution Service',
-        b'Expires on']
+    ]
+
+
+def get_rmw_output_filter(rmw_implementation):
+    prefix_with_resource = ament_index_python.has_resource(
+        'rmw_output_filter', rmw_implementation)
+    if prefix_with_resource:
+        rmw_filter_output_found = False
+        relative_rmw_filter_output_path = ament_index_python.get_resource(
+            'rmw_output_filter', rmw_implementation)
+        rmw_filter_output_path = os.path.join(
+            prefix_with_resource, 'share', rmw_implementation, relative_rmw_filter_output_path)
+        if os.path.isfile(rmw_filter_output_path):
+            with open(rmw_filter_output_path, 'r') as h:
+                rmw_filter_output = h.read()
+                rmw_filter_output_lines = rmw_filter_output.strip().split('\n')
+                additional_filtered_prefixes = [
+                    str.encode(l) for l in rmw_filter_output_lines]
+                rmw_filter_output_found = True
+        if not rmw_filter_output_found:
+            raise LookupError(
+                "Could not read RMW output filter for RMW implementation "
+                "'%s' at expected location %s" % (rmw_implementation, rmw_filter_output_path))
+    else:
+        additional_filtered_prefixes = []
+    return additional_filtered_prefixes
 
 
 def create_handler(
-    name, launch_descriptor, output_file, exit_on_match=True, additional_filtered_prefixes=None,
-    filtered_prefixes=None
+    name, launch_descriptor, output_file, exit_on_match=True, filtered_prefixes=None,
+    filtered_rmw_implementations=None
 ):
     literal_file = output_file + '.txt'
     if os.path.isfile(literal_file):
@@ -100,16 +131,16 @@ def create_handler(
             expected_output = f.read().splitlines()
         return InMemoryHandler(
             name, launch_descriptor, expected_output, regex_match=False,
-            exit_on_match=exit_on_match, additional_filtered_prefixes=additional_filtered_prefixes,
-            filtered_prefixes=filtered_prefixes)
+            exit_on_match=exit_on_match, filtered_prefixes=filtered_prefixes,
+            filtered_rmw_implementations=filtered_rmw_implementations)
     regex_file = output_file + '.regex'
     if os.path.isfile(regex_file):
         with open(regex_file, 'rb') as f:
             expected_output = f.read().splitlines()
         return InMemoryHandler(
             name, launch_descriptor, expected_output, regex_match=True,
-            exit_on_match=exit_on_match, additional_filtered_prefixes=additional_filtered_prefixes,
-            filtered_prefixes=filtered_prefixes)
+            exit_on_match=exit_on_match, filtered_prefixes=filtered_prefixes,
+            filtered_rmw_implementations=filtered_rmw_implementations)
     py_file = output_file + '.py'
     if os.path.isfile(py_file):
         checker_module = SourceFileLoader(
