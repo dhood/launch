@@ -7,6 +7,10 @@ import ament_index_python
 from launch.output_handler import LineOutput
 
 
+class UnmatchedOutputError(BaseException):
+    pass
+
+
 class InMemoryHandler(LineOutput):
     """Aggregate data from standard output.
 
@@ -23,7 +27,8 @@ class InMemoryHandler(LineOutput):
         be ignored in addition to the default/``filtered_prefixes``.
     @param exit_on_match: If True, then when its output is matched, this handler
         will terminate; otherwise it will simply keep track of the match.
-    :raises: :exc:`LookupError`
+    :raises: :py:class:`UnmatchedOutputError` if :py:meth:`check` does not find that the output
+        matches as expected.
     """
 
     def __init__(
@@ -85,9 +90,10 @@ class InMemoryHandler(LineOutput):
 
     def check(self):
         output_lines = self.stdout_data.getvalue().splitlines()
-        assert self.matched, \
-            'Example output (%r) does not match expected output (%r)' % \
-            (output_lines, self.expected_lines)
+        if not self.matched:
+            raise UnmatchedOutputError(
+                'Example output (%r) does not match expected output (%r)' %
+                (output_lines, self.expected_lines))
 
 
 def get_default_filtered_prefixes():
