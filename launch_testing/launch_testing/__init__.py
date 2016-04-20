@@ -14,18 +14,19 @@ class UnmatchedOutputError(BaseException):
 class InMemoryHandler(LineOutput):
     """Aggregate data from standard output.
 
-    @param name: Name of the process being tested.
-    @param launch_descriptor: L{LaunchDescriptor} object that contains the processes in the test.
-    @param expected_lines: A list of lines to match the output literally or a regular expression
+    :param name: Name of the process being tested.
+    :param launch_descriptor: :py:obj:`LaunchDescriptor` object that contains the processes in the
+        test.
+    :param expected_lines: A list of lines to match the output literally or a regular expression.
         that will only need one line to match, instead of the entire output.
-    @param regex_match: If true, treat the expected_lines as a regular expression in match
+    :param regex_match: If true, treat the expected_lines as a regular expression in match
         accordingly.
-    @param filtered_prefixes: A list of prefixes that will cause output lines to be ignored if
+    :param filtered_prefixes: A list of prefixes that will cause output lines to be ignored if
         they start with one of the prefixes. By default lines starting with
         the process ID (`pid`) and return code (`rc`) will be ignored.
-    @param filtered_rmw_implementations: A list of RMW implementations for which the output will
+    :param filtered_rmw_implementations: A list of RMW implementations for which the output will
         be ignored in addition to the default/``filtered_prefixes``.
-    @param exit_on_match: If True, then when its output is matched, this handler
+    :param exit_on_match: If True, then when its output is matched, this handler
         will terminate; otherwise it will simply keep track of the match.
     :raises: :py:class:`UnmatchedOutputError` if :py:meth:`check` does not find that the output
         matches as expected.
