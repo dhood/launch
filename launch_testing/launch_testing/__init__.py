@@ -17,19 +17,23 @@ class InMemoryHandler(LineOutput):
     :param name: Name of the process being tested.
     :param launch_descriptor: :py:obj:`LaunchDescriptor` object that contains the processes in the
         test.
-    :param expected_lines: A list of lines to match the output literally or a regular expression.
+    :param expected_lines: A list of lines to match the output literally or a regular expression
         that will only need one line to match, instead of the entire output.
     :param regex_match: If true, treat the expected_lines as a regular expression in match
         accordingly.
-    :param filtered_prefixes: A list of prefixes that will cause output lines to be ignored if
-        they start with one of the prefixes. By default lines starting with
-        the process ID (`pid`) and return code (`rc`) will be ignored.
+    :param filtered_prefixes: A list of byte strings representing prefixes that will cause output
+        lines to be ignored if they start with one of the prefixes. By default lines starting with
+        the process ID (`b'pid'`) and return code (`b'rc'`) will be ignored.
     :param filtered_rmw_implementation: RMW implementation for which the output will be ignored
         in addition to the default/``filtered_prefixes``.
     :param exit_on_match: If True, then when its output is matched, this handler
         will terminate; otherwise it will simply keep track of the match.
     :raises: :py:class:`UnmatchedOutputError` if :py:meth:`check` does not find that the output
         matches as expected.
+    :raises: :exc:`LookupError` if the `rmw_output_filter` of the `filtered_rmw_implementation`
+        cannot be found.
+    :raises: :exc:`IOError` if the `rmw_output_filter` of the `filtered_rmw_implementation`
+        cannot be opened.
     """
 
     def __init__(
