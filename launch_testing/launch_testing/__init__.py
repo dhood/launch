@@ -24,8 +24,8 @@ class InMemoryHandler(LineOutput):
     :param filtered_prefixes: A list of prefixes that will cause output lines to be ignored if
         they start with one of the prefixes. By default lines starting with
         the process ID (`pid`) and return code (`rc`) will be ignored.
-    :param filtered_rmw_implementations: A list of RMW implementations for which the output will
-        be ignored in addition to the default/``filtered_prefixes``.
+    :param filtered_rmw_implementation: RMW implementation for which the output will be ignored
+        in addition to the default/``filtered_prefixes``.
     :param exit_on_match: If True, then when its output is matched, this handler
         will terminate; otherwise it will simply keep track of the match.
     :raises: :py:class:`UnmatchedOutputError` if :py:meth:`check` does not find that the output
@@ -34,7 +34,7 @@ class InMemoryHandler(LineOutput):
 
     def __init__(
         self, name, launch_descriptor, expected_lines, regex_match=False,
-        filtered_prefixes=None, filtered_rmw_implementations=None, exit_on_match=True
+        filtered_prefixes=None, filtered_rmw_implementation=None, exit_on_match=True
     ):
         super(LineOutput, self).__init__()
         if filtered_prefixes is None:
@@ -42,10 +42,9 @@ class InMemoryHandler(LineOutput):
         else:
             self.filtered_prefixes = filtered_prefixes
 
-        if filtered_rmw_implementations:
-            for rmw_implementation in filtered_rmw_implementations:
-                rmw_output_filter = get_rmw_output_filter(rmw_implementation)
-                self.filtered_prefixes.extend(rmw_output_filter)
+        if filtered_rmw_implementation:
+            rmw_output_filter = get_rmw_output_filter(filtered_rmw_implementation)
+            self.filtered_prefixes.extend(rmw_output_filter)
 
         self.name = name
         self.launch_descriptor = launch_descriptor
@@ -64,7 +63,7 @@ class InMemoryHandler(LineOutput):
             return
 
         for line in lines.splitlines():
-            # Filter out stdout that comes from underlying DDS implementations
+            # Filter out stdout that comes from underlying DDS implementation
             if any([line.startswith(prefix) for prefix in self.filtered_prefixes]):
                 continue
             self.stdout_data.write(line + b'\n')
@@ -130,7 +129,7 @@ def get_rmw_output_filter(rmw_implementation):
 
 def create_handler(
     name, launch_descriptor, output_file, exit_on_match=True, filtered_prefixes=None,
-    filtered_rmw_implementations=None
+    filtered_rmw_implementation=None
 ):
     literal_file = output_file + '.txt'
     if os.path.isfile(literal_file):
@@ -139,7 +138,7 @@ def create_handler(
         return InMemoryHandler(
             name, launch_descriptor, expected_output, regex_match=False,
             exit_on_match=exit_on_match, filtered_prefixes=filtered_prefixes,
-            filtered_rmw_implementations=filtered_rmw_implementations)
+            filtered_rmw_implementation=filtered_rmw_implementation)
     regex_file = output_file + '.regex'
     if os.path.isfile(regex_file):
         with open(regex_file, 'rb') as f:
@@ -147,7 +146,7 @@ def create_handler(
         return InMemoryHandler(
             name, launch_descriptor, expected_output, regex_match=True,
             exit_on_match=exit_on_match, filtered_prefixes=filtered_prefixes,
-            filtered_rmw_implementations=filtered_rmw_implementations)
+            filtered_rmw_implementation=filtered_rmw_implementation)
     py_file = output_file + '.py'
     if os.path.isfile(py_file):
         checker_module = SourceFileLoader(
