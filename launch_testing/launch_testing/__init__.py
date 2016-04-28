@@ -105,25 +105,28 @@ def get_default_filtered_prefixes():
 def get_rmw_output_filter(rmw_implementation):
     prefix_with_resource = ament_index_python.has_resource(
         'rmw_output_filter', rmw_implementation)
-    if prefix_with_resource:
-        rmw_filter_output_found = False
-        relative_rmw_filter_output_path = ament_index_python.get_resource(
-            'rmw_output_filter', rmw_implementation)
-        rmw_filter_output_path = os.path.join(
-            prefix_with_resource, 'share', rmw_implementation, relative_rmw_filter_output_path)
-        if os.path.isfile(rmw_filter_output_path):
-            with open(rmw_filter_output_path, 'r') as h:
-                rmw_filter_output = h.read()
-                rmw_filter_output_lines = rmw_filter_output.strip().split('\n')
-                additional_filtered_prefixes = [
-                    str.encode(l) for l in rmw_filter_output_lines]
-                rmw_filter_output_found = True
-        if not rmw_filter_output_found:
-            raise LookupError(
-                "Could not read RMW output filter for RMW implementation "
-                "'%s' at expected location %s" % (rmw_implementation, rmw_filter_output_path))
-    else:
-        additional_filtered_prefixes = []
+    if not prefix_with_resource:
+        return []
+
+    relative_rmw_filter_output_path = ament_index_python.get_resource(
+        'rmw_output_filter', rmw_implementation)
+    rmw_filter_output_path = os.path.join(
+        prefix_with_resource, 'share', rmw_implementation, relative_rmw_filter_output_path)
+    if not os.path.isfile(rmw_filter_output_path):
+        raise LookupError(
+            "Could not find RMW output filter for RMW implementation "
+            "'%s' at expected location %s" % (rmw_implementation, rmw_filter_output_path))
+
+    try:
+        with open(rmw_filter_output_path, 'rb') as h:
+            rmw_filter_output = h.read()
+            rmw_filter_output_lines = rmw_filter_output.splitlines()
+            additional_filtered_prefixes = [
+                l for l in rmw_filter_output_lines]
+    except IOError as e:
+        raise IOError(
+            "Could not open RMW output filter for RMW implementation "
+            "'%s': %s" % (rmw_implementation, e))
     return additional_filtered_prefixes
 
 
